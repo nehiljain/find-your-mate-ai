@@ -73,33 +73,26 @@ Here is the content of a founder looking for a match on YCombinator Founder matc
 Given the contextual information, extract out a {class_name} object.\
 """
 
-def ingest_and_index_data(source_data_path: str, output_data_path: str) -> Tuple[VectorStoreIndex, List[BaseNode]]:
+def ingest_and_index_data(source_data_path: str, output_data_path: str) -> List[BaseNode]:
     """Ingests data from the specified directory path."""
     source_data_path = Path(source_data_path)
     output_data_path = Path(output_data_path)
     if not source_data_path.exists() or not source_data_path.is_dir():
-        logging.error("Invalid source data directory path.")
+        logging.error("Invalid source data directory path: %s", source_data_path)
         sys.exit(1)
     if not output_data_path.exists() or not output_data_path.is_dir():
-        logging.error("Invalid output data directory path.")
+        logging.error("Invalid output data directory path: %s", output_data_path)
         sys.exit(1)
-    logging.info(f"Starting data ingestion from {source_data_path}")
+    logging.info("Starting data ingestion from %s", source_data_path)
 
     # Configure OpenAI API key
     openai.api_key = settings.OPENAI_API_KEY
     logging.info("OpenAI API key configured")
 
-    # TODO: Lancedb doesnt work with the latest vector store.
-    # Swap to something else. Make sure it can run locally
-    # Configure LanceDB vector store
-    uri = f"{output_data_path}/index.lancedb"
-    vector_store = LanceDBVectorStore(uri=uri)
-    storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    logging.info(f"LanceDB vector store configured at {uri}")
 
     # Load documents from the specified directory
     documents = SimpleDirectoryReader(source_data_path).load_data()
-    logging.info(f"Loaded {len(documents)} documents from {source_data_path}")
+    logging.info("Loaded %d documents from %s", len(documents), source_data_path)
 
     # Configuring cache
     cache = IngestionCache(
@@ -108,27 +101,16 @@ def ingest_and_index_data(source_data_path: str, output_data_path: str) -> Tuple
     )
 
     gpt3 = OpenAI(model="gpt-3.5-turbo")
-
     openai_program = OpenAIPydanticProgram.from_defaults(
       output_cls=CofounderMetadata,
       prompt_template_str=EXTRACT_TEMPLATE_STR,
       llm=gpt3,
     )
-
     program_extractor = PydanticProgramExtractor(
         program=openai_program, input_key="input", show_progress=True
     )
 
     # Configure document store
-    docstore = SimpleDocumentStore()
-    logging.info("Document store configured")
-
-    # Parse Markdown documents
-    parser = MarkdownNodeParser()
-    nodes = parser.get_nodes_from_documents(documents)
-    docstore.add_documents(nodes)
-    logging.debug(f"Parsed and stored {len(nodes)} nodes in the document store")
-
 
     # Configure ingestion pipeline
     pipeline = IngestionPipeline(
@@ -137,28 +119,17 @@ def ingest_and_index_data(source_data_path: str, output_data_path: str) -> Tuple
             MarkdownNodeParser(),
             OpenAIEmbedding(),
         ],
-        docstore=SimpleDocumentStore(),
-        vector_store=vector_store,
-        docstore_strategy=DocstoreStrategy.UPSERTS_AND_DELETE
     )
     pipeline.load(f"{output_data_path}/pipeline_storage")
     logging.info("Ingestion pipeline configured")
 
     # Run ingestion pipeline
-    nodes: List[BaseNode] = pipeline.run(documents=documents)
-    logging.info(f"pipeline run finished with {len(nodes)} nodes created and stores")
+    nodes = pipeline.run(documents=documents)
+    logging.info("Pipeline run finished with %d nodes created and stored", len(nodes))
     pipeline.persist(f"{output_data_path}/pipeline_storage")
-    logging.info(f"Ingestion pipeline completed, persisted at {output_data_path}/pipeline_storage")
+    logging.info("Ingestion pipeline completed, persisted at %s", output_data_path)
 
-    # Create vector store index
-    vector_index = VectorStoreIndex(
-        nodes=nodes,
-        vector_store=vector_store,
-        storage_context=storage_context,
-    )
-    logging.info("Vector store index created")
-
-    return vector_index, nodes
+    return nodes
 
 
 if __name__ == "__main__":
