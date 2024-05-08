@@ -7,24 +7,28 @@ After the data is stored in the vector store, it is ready for querying.
 import logging
 import sys
 from pathlib import Path
+import re
 
-from typing import List, Tuple
+from typing import List
 from pydantic import BaseModel, Field
+import pendulum
 import typer
 from dynaconf import settings
 import openai
-from llama_index.core import SimpleDirectoryReader, StorageContext
+import pandas as pd
+
+from llama_index.core.evaluation import generate_question_context_pairs
+from llama_index.llms.openai import OpenAI
+from llama_index.core import SimpleDirectoryReader
 from llama_index.core import VectorStoreIndex
-from llama_index.vector_stores.lancedb import LanceDBVectorStore
 from llama_index.core.node_parser import MarkdownNodeParser
 from llama_index.storage.kvstore.redis import RedisKVStore as RedisCache
-from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.core.schema import BaseNode
-from llama_index.core.ingestion import IngestionPipeline, IngestionCache, DocstoreStrategy
+from llama_index.core.ingestion import IngestionPipeline, IngestionCache
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.program.openai import OpenAIPydanticProgram
 from llama_index.core.extractors import PydanticProgramExtractor
-from llama_index.llms.openai import OpenAI
+
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
@@ -73,7 +77,7 @@ Here is the content of a founder looking for a match on YCombinator Founder matc
 Given the contextual information, extract out a {class_name} object.\
 """
 
-def ingest_and_index_data(source_data_path: str, output_data_path: str) -> List[BaseNode]:
+def ingest_profiles_data(source_data_path: str, output_data_path: str) -> List[BaseNode]:
     """Ingests data from the specified directory path."""
     source_data_path = Path(source_data_path)
     output_data_path = Path(output_data_path)
@@ -131,6 +135,58 @@ def ingest_and_index_data(source_data_path: str, output_data_path: str) -> List[
 
     return nodes
 
+def index_profiles_data(nodes: List[BaseNode], output_data_path: str) -> VectorStoreIndex:
+    """Indexes the profiles data using a VectorStore.
+    Args:
+        nodes: List[BaseNode]: List of nodes to index.
+        output_data_path: str: Path to store the index.
+    Returns:
+        VectorStoreIndex: Index that can be used for retrieval and querying.
+    """
+    # Create vector store index
+    pass
+
+
+def from_qa_dataset_to_df(qa_dataset) -> pd.DataFrame:
+    """Converts a qa_dataset to a pandas dataframe
+
+    Args:
+        qa_dataset: QADataSet: QA dataset to convert to a pandas dataframe.
+    Returns:
+        pd.DataFrame: Pandas dataframe containing the QA dataset.
+    """
+    rows = []
+    for query_id, query_text in qa_dataset.queries.items():
+        relevant_doc_ids = qa_dataset.relevant_docs[query_id]
+        doc_texts = [qa_dataset.corpus[doc_id] for doc_id in relevant_doc_ids]
+        separator = '\n' + '='*10 + '\n' + '='* 10 + '\n'
+        doc_text_combined = separator.join(doc_texts)
+        rows.append({
+            'query_id': 'query_id',
+            'answer_ids': relevant_doc_ids,
+            'query_text': query_text.replace('"', "'"),
+            'answer_contents': doc_texts,
+            'answer_contents_str': doc_text_combined.replace('"', "'")
+        })
+
+    df = pd.DataFrame(rows)
+    return df
+
+def generate_synthetic_questions_data(nodes: List[BaseNode],
+                                      output_data_path: str) -> List[BaseNode]:
+    """Generates synthetic questions data using llama_index function"""
+    gpt4 = OpenAI(temperature=1, model="gpt-4")
+    qa_dataset = generate_question_context_pairs(
+        nodes, llm=gpt4, num_questions_per_chunk=2
+    )
+    qa_df = from_qa_dataset_to_df(qa_dataset)
+    current_time = pendulum.now().format("YYYY-MM-DD_HH-mm-ss")
+    filename = f"synthetic_questions_label_studio_ready_{current_time}.json"
+    filename_slugified = re.sub(r'\W+', '_', filename)
+    qa_df.to_json(Path(output_data_path, filename_slugified), orient="records")
+    logging.info("Synthetic questions data generated and saved at %s", output_data_path)
+    return qa_df
+
 
 if __name__ == "__main__":
-    typer.run(ingest_and_index_data)
+    typer.run(ingest_profiles_data)
