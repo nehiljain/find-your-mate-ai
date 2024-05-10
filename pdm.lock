@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:dbabdc09027df13bd64784df727d0ae5106c70d5581b07b398bcb8ce8fcf6ec5"
+content_hash = "sha256:a0aa3bdf2ebcd74dd47af8bbeadc2eaff64ddb5601b24e2d03a05e13b66873e2"
 
 [[package]]
 name = "aiohttp"
@@ -525,6 +525,17 @@ groups = ["default"]
 files = [
     {file = "distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2"},
     {file = "distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed"},
+]
+
+[[package]]
+name = "dnspython"
+version = "2.6.1"
+requires_python = ">=3.8"
+summary = "DNS toolkit"
+groups = ["default"]
+files = [
+    {file = "dnspython-2.6.1-py3-none-any.whl", hash = "sha256:5ef3b9680161f6fa89daf8ad451b5f1a33b18ae8a1c6778cdf4b43f08c0a6e50"},
+    {file = "dnspython-2.6.1.tar.gz", hash = "sha256:e8f0f9c23a7b7cb99ded64e6c3a6f3e701d78f50c55e002b839dea7225cff7cc"},
 ]
 
 [[package]]
@@ -1359,7 +1370,7 @@ files = [
 
 [[package]]
 name = "llama-index-llms-openai"
-version = "0.1.17"
+version = "0.1.18"
 requires_python = "<4.0,>=3.8.1"
 summary = "llama-index llms openai integration"
 groups = ["default"]
@@ -1367,8 +1378,8 @@ dependencies = [
     "llama-index-core<0.11.0,>=0.10.24",
 ]
 files = [
-    {file = "llama_index_llms_openai-0.1.17-py3-none-any.whl", hash = "sha256:04d1906ca1fbd34f8322acb5565fbfd605c5ea0e000bfba4fd0b1f512c7e0ca0"},
-    {file = "llama_index_llms_openai-0.1.17.tar.gz", hash = "sha256:66d3af761dc232388b54a017b0cb8401ebd74c02d69cae7d604d8288ec1b683d"},
+    {file = "llama_index_llms_openai-0.1.18-py3-none-any.whl", hash = "sha256:934cf72d10385f1c76c0183b0e94ce1850fab1026287e01b7db0a14c946dfd79"},
+    {file = "llama_index_llms_openai-0.1.18.tar.gz", hash = "sha256:8cb7546a1885ba558ff580b114d638569a0aed81a264961114e719bc42b37100"},
 ]
 
 [[package]]
@@ -1451,6 +1462,21 @@ files = [
 ]
 
 [[package]]
+name = "llama-index-storage-docstore-mongodb"
+version = "0.1.3"
+requires_python = ">=3.8.1,<4.0"
+summary = "llama-index docstore mongodb integration"
+groups = ["default"]
+dependencies = [
+    "llama-index-core<0.11.0,>=0.10.1",
+    "llama-index-storage-kvstore-mongodb<0.2.0,>=0.1.1",
+]
+files = [
+    {file = "llama_index_storage_docstore_mongodb-0.1.3-py3-none-any.whl", hash = "sha256:e90e9abdb9d0e33b6d670ad499ad7c2b551dabb3deddf90c418484c5da10c9bf"},
+    {file = "llama_index_storage_docstore_mongodb-0.1.3.tar.gz", hash = "sha256:fc5a4e0a3a3d29c157123c241f3ea88c843b8070d66d956445de5e7fd4ce0915"},
+]
+
+[[package]]
 name = "llama-index-storage-docstore-redis"
 version = "0.1.2"
 requires_python = ">=3.8.1,<4.0"
@@ -1463,6 +1489,36 @@ dependencies = [
 files = [
     {file = "llama_index_storage_docstore_redis-0.1.2-py3-none-any.whl", hash = "sha256:bdd19fd63d75ecde5ac97a7dbe3c6889b933b816817ca159b35534aeba42a1ef"},
     {file = "llama_index_storage_docstore_redis-0.1.2.tar.gz", hash = "sha256:1dc6878d0e6a7b88171c6daf80ab73ac3cd819c6c72fdf7f21c88e9b29376241"},
+]
+
+[[package]]
+name = "llama-index-storage-index-store-mongodb"
+version = "0.1.2"
+requires_python = ">=3.8.1,<4.0"
+summary = "llama-index index_store mongodb integration"
+groups = ["default"]
+dependencies = [
+    "llama-index-core<0.11.0,>=0.10.1",
+    "llama-index-storage-kvstore-mongodb<0.2.0,>=0.1.1",
+]
+files = [
+    {file = "llama_index_storage_index_store_mongodb-0.1.2-py3-none-any.whl", hash = "sha256:783588d80a8c4ca5c490aaf226c7bdd01be3fe7f497f7390bd900803fc56476a"},
+    {file = "llama_index_storage_index_store_mongodb-0.1.2.tar.gz", hash = "sha256:08d05f7710f9e8537868f74c5d912351c974ddb4abcb62930e6348b5a7ca82b6"},
+]
+
+[[package]]
+name = "llama-index-storage-kvstore-mongodb"
+version = "0.1.2"
+requires_python = ">=3.8.1,<4.0"
+summary = "llama-index kvstore mongodb integration"
+groups = ["default"]
+dependencies = [
+    "llama-index-core<0.11.0,>=0.10.1",
+    "pymongo<5.0.0,>=4.6.1",
+]
+files = [
+    {file = "llama_index_storage_kvstore_mongodb-0.1.2-py3-none-any.whl", hash = "sha256:d47681d7380468871d755ef368ef84977d8804d81053f1d653dfa79832922826"},
+    {file = "llama_index_storage_kvstore_mongodb-0.1.2.tar.gz", hash = "sha256:2e2a07f733eafcf13ce9a6a8a29e2ca9335594671191d63ec37c6cce73760b03"},
 ]
 
 [[package]]
@@ -1661,6 +1717,20 @@ groups = ["default"]
 files = [
     {file = "mistune-3.0.2-py3-none-any.whl", hash = "sha256:71481854c30fdbc938963d3605b72501f5c10a9320ecd412c121c163a1c7d205"},
     {file = "mistune-3.0.2.tar.gz", hash = "sha256:fc7f93ded930c92394ef2cb6f04a8aabab4117a91449e72dcc8dfa646a508be8"},
+]
+
+[[package]]
+name = "motor"
+version = "3.4.0"
+requires_python = ">=3.7"
+summary = "Non-blocking MongoDB driver for Tornado or asyncio"
+groups = ["default"]
+dependencies = [
+    "pymongo<5,>=4.5",
+]
+files = [
+    {file = "motor-3.4.0-py3-none-any.whl", hash = "sha256:4b1e1a0cc5116ff73be2c080a72da078f2bb719b53bc7a6bb9e9a2f7dcd421ed"},
+    {file = "motor-3.4.0.tar.gz", hash = "sha256:c89b4e4eb2e711345e91c7c9b122cb68cce0e5e869ed0387dd0acb10775e3131"},
 ]
 
 [[package]]
@@ -1900,13 +1970,13 @@ files = [
 
 [[package]]
 name = "packaging"
-version = "24.0"
+version = "23.2"
 requires_python = ">=3.7"
 summary = "Core utilities for Python packages"
 groups = ["default"]
 files = [
-    {file = "packaging-24.0-py3-none-any.whl", hash = "sha256:2ddfb553fdf02fb784c234c7ba6ccc288296ceabec964ad2eae3777778130bc5"},
-    {file = "packaging-24.0.tar.gz", hash = "sha256:eb82c5e3e56209074766e6885bb04b8c38a0c015d0a30036ebe7ece34c9989e9"},
+    {file = "packaging-23.2-py3-none-any.whl", hash = "sha256:8c491190033a9af7e1d931d0b5dacc2ef47509b34dd0de67ed209b5203fc88c7"},
+    {file = "packaging-23.2.tar.gz", hash = "sha256:048fb0e9405036518eaaf48a55953c750c11e1a1b68e0dd1a9d62ed0c092cfc5"},
 ]
 
 [[package]]
@@ -2160,22 +2230,22 @@ files = [
 
 [[package]]
 name = "pyarrow"
-version = "16.0.0"
+version = "15.0.2"
 requires_python = ">=3.8"
 summary = "Python library for Apache Arrow"
 groups = ["default"]
 dependencies = [
-    "numpy>=1.16.6",
+    "numpy<2,>=1.16.6",
 ]
 files = [
-    {file = "pyarrow-16.0.0-cp311-cp311-macosx_10_15_x86_64.whl", hash = "sha256:d22d0941e6c7bafddf5f4c0662e46f2075850f1c044bf1a03150dd9e189427ce"},
-    {file = "pyarrow-16.0.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:266ddb7e823f03733c15adc8b5078db2df6980f9aa93d6bb57ece615df4e0ba7"},
-    {file = "pyarrow-16.0.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5cc23090224b6594f5a92d26ad47465af47c1d9c079dd4a0061ae39551889efe"},
-    {file = "pyarrow-16.0.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:56850a0afe9ef37249d5387355449c0f94d12ff7994af88f16803a26d38f2016"},
-    {file = "pyarrow-16.0.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:705db70d3e2293c2f6f8e84874b5b775f690465798f66e94bb2c07bab0a6bb55"},
-    {file = "pyarrow-16.0.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:5448564754c154997bc09e95a44b81b9e31ae918a86c0fcb35c4aa4922756f55"},
-    {file = "pyarrow-16.0.0-cp311-cp311-win_amd64.whl", hash = "sha256:729f7b262aa620c9df8b9967db96c1575e4cfc8c25d078a06968e527b8d6ec05"},
-    {file = "pyarrow-16.0.0.tar.gz", hash = "sha256:59bb1f1edbbf4114c72415f039f1359f1a57d166a331c3229788ccbfbb31689a"},
+    {file = "pyarrow-15.0.2-cp311-cp311-macosx_10_15_x86_64.whl", hash = "sha256:5f8bc839ea36b1f99984c78e06e7a06054693dc2af8920f6fb416b5bca9944e4"},
+    {file = "pyarrow-15.0.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:f5e81dfb4e519baa6b4c80410421528c214427e77ca0ea9461eb4097c328fa33"},
+    {file = "pyarrow-15.0.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3a4f240852b302a7af4646c8bfe9950c4691a419847001178662a98915fd7ee7"},
+    {file = "pyarrow-15.0.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4e7d9cfb5a1e648e172428c7a42b744610956f3b70f524aa3a6c02a448ba853e"},
+    {file = "pyarrow-15.0.2-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:2d4f905209de70c0eb5b2de6763104d5a9a37430f137678edfb9a675bac9cd98"},
+    {file = "pyarrow-15.0.2-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:90adb99e8ce5f36fbecbbc422e7dcbcbed07d985eed6062e459e23f9e71fd197"},
+    {file = "pyarrow-15.0.2-cp311-cp311-win_amd64.whl", hash = "sha256:b116e7fd7889294cbd24eb90cd9bdd3850be3738d61297855a71ac3b8124ee38"},
+    {file = "pyarrow-15.0.2.tar.gz", hash = "sha256:9c9bc803cb3b7bfacc1e96ffbfd923601065d9d3f911179d81e72d99fd74a3d9"},
 ]
 
 [[package]]
@@ -2299,6 +2369,49 @@ files = [
     {file = "pylance-0.9.18-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:10af06edfde3e8451bf2251381d3980a0a164eab9d4c3d4dc8b6318969e958a6"},
     {file = "pylance-0.9.18-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:d8bb9045d7163cc966b9fe34a917044192be37a90915475b77461e5b7d89e442"},
     {file = "pylance-0.9.18-cp38-abi3-win_amd64.whl", hash = "sha256:5ea80b7bf70d992f3fe63bce2d2f064f742124c04eaedeb76baca408ded85a2c"},
+]
+
+[[package]]
+name = "pymongo"
+version = "4.7.2"
+requires_python = ">=3.7"
+summary = "Python driver for MongoDB <http://www.mongodb.org>"
+groups = ["default"]
+dependencies = [
+    "dnspython<3.0.0,>=1.16.0",
+]
+files = [
+    {file = "pymongo-4.7.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:fc5af24fcf5fc6f7f40d65446400d45dd12bea933d0299dc9e90c5b22197f1e9"},
+    {file = "pymongo-4.7.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:730778b6f0964b164c187289f906bbc84cb0524df285b7a85aa355bbec43eb21"},
+    {file = "pymongo-4.7.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:47a1a4832ef2f4346dcd1a10a36ade7367ad6905929ddb476459abb4fd1b98cb"},
+    {file = "pymongo-4.7.2-cp311-cp311-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:e6eab12c6385526d386543d6823b07187fefba028f0da216506e00f0e1855119"},
+    {file = "pymongo-4.7.2-cp311-cp311-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:37e9ea81fa59ee9274457ed7d59b6c27f6f2a5fe8e26f184ecf58ea52a019cb8"},
+    {file = "pymongo-4.7.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7e9d9d2c0aae73aa4369bd373ac2ac59f02c46d4e56c4b6d6e250cfe85f76802"},
+    {file = "pymongo-4.7.2-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:cb6e00a79dff22c9a72212ad82021b54bdb3b85f38a85f4fc466bde581d7d17a"},
+    {file = "pymongo-4.7.2-cp311-cp311-win32.whl", hash = "sha256:02efd1bb3397e24ef2af45923888b41a378ce00cb3a4259c5f4fc3c70497a22f"},
+    {file = "pymongo-4.7.2-cp311-cp311-win_amd64.whl", hash = "sha256:87bb453ac3eb44db95cb6d5a616fbc906c1c00661eec7f55696253a6245beb8a"},
+    {file = "pymongo-4.7.2.tar.gz", hash = "sha256:9024e1661c6e40acf468177bf90ce924d1bc681d2b244adda3ed7b2f4c4d17d7"},
+]
+
+[[package]]
+name = "pymongoarrow"
+version = "1.3.0"
+requires_python = ">=3.8"
+summary = "\"Tools for using NumPy, Pandas, Polars, and PyArrow with MongoDB\""
+groups = ["default"]
+dependencies = [
+    "packaging<24,>=23.2",
+    "pandas<3,>=1.3.5",
+    "pyarrow<15.1,>=15.0",
+    "pymongo<5,>=4.4",
+]
+files = [
+    {file = "pymongoarrow-1.3.0-cp311-cp311-macosx_10_15_x86_64.whl", hash = "sha256:4c53d77120ab425660d57d0bf958859a0822acd9a65c64a81d7ff14fc18aae13"},
+    {file = "pymongoarrow-1.3.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:4c20584792f46ccc2adcb70231bcc3497436042b0b38c8c5a278f15d294a892b"},
+    {file = "pymongoarrow-1.3.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:e0aae95ffa37e4e86b54417b3a92fcb8b07f65c99acae791227dd6e72385e0b6"},
+    {file = "pymongoarrow-1.3.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:284416a33a6d88f0705c10c5baf567261335c56846a2a7ec5ff640c6029c965f"},
+    {file = "pymongoarrow-1.3.0-cp311-cp311-win_amd64.whl", hash = "sha256:8fd1128fe5681f3533e380f36dfbd904ae321f12b43dfaac8f5e6fa3b6048c5f"},
+    {file = "pymongoarrow-1.3.0.tar.gz", hash = "sha256:e409b7a2f388f6c3a8b82e164bcfa82d1a330ab0f891fa0945d1ba4c6f29f6f1"},
 ]
 
 [[package]]

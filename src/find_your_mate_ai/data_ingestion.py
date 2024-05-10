@@ -12,23 +12,28 @@ import re
 from typing import List
 from pydantic import BaseModel, Field
 import pendulum
-import typer
 from dynaconf import settings
 import openai
 import pandas as pd
 
+from pymongo import MongoClient
+from pymongo.server_api import ServerApi
+
+
+from config import settings
 from llama_index.core.evaluation import generate_question_context_pairs
 from llama_index.llms.openai import OpenAI
-from llama_index.core import SimpleDirectoryReader
-from llama_index.core import VectorStoreIndex
+from llama_index.core import SimpleDirectoryReader, StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import MarkdownNodeParser
 from llama_index.storage.kvstore.redis import RedisKVStore as RedisCache
 from llama_index.core.schema import BaseNode
+from llama_index.storage.docstore.mongodb import MongoDocumentStore
 from llama_index.core.ingestion import IngestionPipeline, IngestionCache
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.program.openai import OpenAIPydanticProgram
 from llama_index.core.extractors import PydanticProgramExtractor
-
+from pymongoarrow.monkey import patch_all
+patch_all()
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
@@ -37,9 +42,11 @@ logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 
 class CofounderMetadata(BaseModel):
     """Node metadata."""
-
     name: str = Field(
         ..., description="Name of the founder in the profile. Usually in headers"
+    )
+    profile_url: str = Field(
+        ..., description="The url of the profile which is the url of the page"
     )
     linkedin_url: str = Field(
         ..., description="A linked in profile url attached to the profile. Could be None but very rarely."
@@ -71,11 +78,49 @@ class CofounderMetadata(BaseModel):
 
 EXTRACT_TEMPLATE_STR = """\
 Here is the content of a founder looking for a match on YCombinator Founder matching platform:
+
 <content>
 {context_str}
-</content>
-Given the contextual information, extract out a {class_name} object.\
+</content> \
 """
+
+def fetch_all_documents_from_mongodb(mongo_uri: str, db_name: str, collection_name: str) -> pd.DataFrame:
+    """
+    Fetches all metadata from documents stored in a MongoDB collection and returns it as a pandas DataFrame.
+
+    Args:
+    mongo_uri (str): MongoDB URI for connecting to the database.
+    db_name (str): Name of the database.
+    collection_name (str): Name of the collection where documents are stored.
+
+    Returns:
+    pd.DataFrame: DataFrame containing all metadata from the documents.
+    """
+    # Create a new client and connect to the server with MongoDB versioning
+    client = MongoClient(settings.MONGO_URI, server_api=ServerApi('1'))
+
+    # Access the specific database and collection
+    database = client[db_name]
+    collection = database[collection_name]
+
+    # Use pymongoarrow to fetch all documents as a pandas DataFrame
+    df = collection.find_pandas_all({})
+
+    metadata_df = df['__data__'].apply(lambda x: x.get('metadata', {})).apply(pd.Series)
+
+    # Join the metadata columns back to the original DataFrame
+    result_df = df.join(metadata_df)
+    result_df = result_df[['_id', 'file_path', 'file_name', 'file_size', 'creation_date', 'last_modified_date']]
+    logging.info("Fetched %d documents from MongoDB", len(result_df))
+    logging.info("Columns in the DataFrame: %s", result_df.columns)
+    # Remove duplicate rows from the DataFrame
+    result_df.drop_duplicates(subset=result_df.columns.difference(['_id']), keep='first', inplace=True)
+    logging.info("Dropped %d duplicate rows from the DataFrame", len(df) - len(result_df))
+    # Clean up by closing the MongoDB client
+    client.close()
+
+    return result_df
+
 
 def ingest_profiles_data(source_data_path: str, output_data_path: str) -> List[BaseNode]:
     """Ingests data from the specified directory path."""
@@ -93,10 +138,33 @@ def ingest_profiles_data(source_data_path: str, output_data_path: str) -> List[B
     openai.api_key = settings.OPENAI_API_KEY
     logging.info("OpenAI API key configured")
 
-
+    MONGO_URI = settings.MONGO_URI
+    storage_context = StorageContext.from_defaults(
+        docstore=MongoDocumentStore.from_uri(uri=MONGO_URI),
+    )
     # Load documents from the specified directory
-    documents = SimpleDirectoryReader(source_data_path).load_data()
-    logging.info("Loaded %d documents from %s", len(documents), source_data_path)
+    documents = SimpleDirectoryReader(source_data_path, required_exts=['.mdx']).load_data()
+    documents = documents[:50]
+    documents_df = pd.DataFrame([doc.to_dict() for doc in documents])
+    metadata_df = documents_df['metadata'].apply(pd.Series)
+    documents_df = pd.concat([documents_df.drop(columns=['metadata']), metadata_df], axis=1)
+
+    db_name='db_docstore'
+    collection_name='docstore/data'
+    existing_documents_df = fetch_all_documents_from_mongodb(MONGO_URI, db_name, collection_name)
+    logging.info("Pre-existing documents in MongoDB: %d", len(existing_documents_df))
+    # Extract relevant columns for comparison
+    comparison_columns = ['file_path', 'file_name', 'file_size', 'creation_date', 'last_modified_date']
+    existing_documents_df = existing_documents_df[comparison_columns]
+
+    # Filter out documents that already exist in MongoDB
+    documents_df = documents_df.merge(existing_documents_df, on=comparison_columns, how='left', indicator=True)
+    documents_df = documents_df[documents_df['_merge'] == 'left_only'].drop(columns=['_merge'])
+
+    # Filter documents based on the file_name that exist in document_df
+    documents = [doc for doc in documents if doc.metadata['file_name'] in documents_df.file_name.values]
+    logging.info("Loaded %d new documents from %s", len(documents), source_data_path)
+
 
     # Configuring cache
     cache = IngestionCache(
@@ -104,14 +172,15 @@ def ingest_profiles_data(source_data_path: str, output_data_path: str) -> List[B
       collection="redis_cache",
     )
 
-    gpt3 = OpenAI(model="gpt-3.5-turbo")
+    gpt3 = OpenAI(model="gpt-4")
     openai_program = OpenAIPydanticProgram.from_defaults(
       output_cls=CofounderMetadata,
       prompt_template_str=EXTRACT_TEMPLATE_STR,
       llm=gpt3,
+      # extract_template_str=EXTRACT_TEMPLATE_STR
     )
     program_extractor = PydanticProgramExtractor(
-        program=openai_program, input_key="input", show_progress=True
+        program=openai_program, input_key="context_str", show_progress=True
     )
 
     # Configure document store
@@ -124,14 +193,23 @@ def ingest_profiles_data(source_data_path: str, output_data_path: str) -> List[B
             OpenAIEmbedding(),
         ],
     )
-    pipeline.load(f"{output_data_path}/pipeline_storage")
-    logging.info("Ingestion pipeline configured")
 
+    pipeline_storage_path = f"{output_data_path}/pipeline_storage"
+    try:
+        if any(Path(pipeline_storage_path).iterdir()):
+            pipeline.load(pipeline_storage_path)
+            logging.info("Ingestion pipeline configured")
+    except FileNotFoundError:
+        logging.info("Pipeline storage directory does not exist or is empty. Skipping pipeline load.")
     # Run ingestion pipeline
     nodes = pipeline.run(documents=documents)
     logging.info("Pipeline run finished with %d nodes created and stored", len(nodes))
     pipeline.persist(f"{output_data_path}/pipeline_storage")
     logging.info("Ingestion pipeline completed, persisted at %s", output_data_path)
+
+
+    storage_context.docstore.add_documents(nodes)
+    logging.info("Ingested %d nodes and stored in MongoDB", len(nodes))
 
     return nodes
 
@@ -184,9 +262,15 @@ def generate_synthetic_questions_data(nodes: List[BaseNode],
     filename = f"synthetic_questions_label_studio_ready_{current_time}.json"
     filename_slugified = re.sub(r'\W+', '_', filename)
     qa_df.to_json(Path(output_data_path, filename_slugified), orient="records")
-    logging.info("Synthetic questions data generated and saved at %s", output_data_path)
+    logging.info("Synthetic questions data generated and saved to %s", Path(output_data_path, filename_slugified))
     return qa_df
 
-
+def main():
+    nodes = ingest_profiles_data(
+        source_data_path=settings.SOURCE_DATA_PATH,
+        output_data_path=settings.OUTPUT_DATA_PATH,
+    )
+    logging.info("Ingested %d nodes and stored in MongoDB", len(nodes))
+    generate_synthetic_questions_data(nodes, settings.OUTPUT_DATA_PATH)
 if __name__ == "__main__":
-    typer.run(ingest_profiles_data)
+    main()

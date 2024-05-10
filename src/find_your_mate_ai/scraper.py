@@ -19,6 +19,7 @@ from playwright.sync_api import sync_playwright
 from pydantic import BaseModel
 from unstructured.partition.html import partition_html
 from unstructured.staging.base import convert_to_dataframe
+from config import settings
 
 # Configure logging
 logging.basicConfig(
@@ -136,8 +137,11 @@ def load_cookies(cookie_path: Optional[str] = None):
     """
     Load cookies from a specified path or default path.
     """
+    if cookie_path is None and settings.COOKIES_FILEPATH is None:
+        raise ValueError("Cookie path is not set in the settings or provided by user.")
     if cookie_path is None:
-        cookie_path = "./startup-school-cookies.json"
+        cookie_path = settings.COOKIES_FILEPATH
+
     with open(cookie_path, "r") as f:
         return json.load(f)
 
@@ -238,7 +242,9 @@ def scrape_profile(context, url):
     # Generate markdown file from the HTML content
     logging.info("Extracting structured data from %s", output_txt_path)
     founder_profile = extract_clean_md_urls(output_txt_path)
-    output_md_path = get_output_path(f"{slugify(headings[0])}.md")
+    # The reason to choose .mdx extension is because of a nuance in llama index
+    # I dont want it to default use MarkdownParser which breaks the file into chunks
+    output_md_path = get_output_path(f"{slugify(headings[0])}.mdx")
     logging.info("Writing markdown output to %s", output_md_path)
     with open(output_md_path, "w") as md_file:
         md_file.write(founder_profile.md_content)

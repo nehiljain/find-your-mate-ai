@@ -168,4 +168,11 @@ cython_debug/
 # Ignore data files in data folders
 data/*.png
 data/*.txt
+data/*.mdx
+data/*.json
 data/*.md
+data/*.csv
+data/pipeline_storage/*
+
+# Ignore dynaconf secret files
+.secrets.*

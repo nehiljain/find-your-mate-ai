@@ -1,0 +1,3 @@
+COOKIES_FILEPATH = "/Users/nehiljain/code/find-your-mate-ai/.startupschool-cookie.json"
+SOURCE_DATA_PATH = "/Users/nehiljain/code/find-your-mate-ai/data/"
+OUTPUT_DATA_PATH = "/Users/nehiljain/code/find-your-mate-ai/data/"
