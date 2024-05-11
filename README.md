@@ -4,7 +4,9 @@
 ## Overview
 
 
-The Find Your Mate AI project is designed to scrape and process cofounder matching profiles from startupschool.org. It involves scraping the web pages, extracting relevant information, and storing it in a structured format for further analysis.
+The Find Your Mate AI project is designed to scrape and process cofounder matching profiles from [startupschool.org](https://www.ycombinator.com/cofounder-matching). It involves scraping the web pages, extracting relevant information, and storing it in a structured format for Querying them.
+
+This is a project born out of my own itch and helps me learn how to use LLM's to build a search based apps.
 
 
 ## Setup and Installation
@@ -15,7 +17,9 @@ The Find Your Mate AI project is designed to scrape and process cofounder matchi
 
 - Python 3.8 or higher
 - macOS operating system
-
+- MongoDB Account [Register here](https://www.mongodb.com/docs/guides/atlas/account/)
+- YC Account Profile [Signup here](https://www.ycombinator.com/cofounder-matching)
+- EditThisCookie Chrome Extension [Install here](https://chromewebstore.google.com/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg)
 
 ### Installation
 
@@ -29,25 +33,25 @@ The Find Your Mate AI project is designed to scrape and process cofounder matchi
 2. **Install PDM (Python Dependency Manager):**
 
 ```
-  brew install pdm
+brew install pdm
 ```
 
 3. **Install the project dependencies:**
 ```
-     pdm install
+pdm install
 ```
 ```
 pdm run playwright install
 ```
 
+3. Export Cookies by following the instructions at
+[EditThisCookie Chrome Extension](https://docs.apify.com/academy/tools/edit-this-cookie#export-cookies)
+
 ## Environment Variables
 
 
-- create a .env file in the root directory of the project and add the following environment variables:
+- Create settings.toml and .secrets.toml in the root directory of the project and add the following environment variables:
 
-```
-OPENAI_API_KEY=<your-openai-api-key>
-```
 
 
 
@@ -57,7 +61,7 @@ OPENAI_API_KEY=<your-openai-api-key>
 
 To scrape the cofounder matching profiles, run the following command:
 ```
-pdm run python src/find_your_mate_ai/scraper.py --cookie-path "./custom-path/startup-school-cookies.json" --urls "https://www.startupschool.org/cofounder-matching/candidate/123" "https://www.startupschool.org/cofounder-matching/candidate/456"
+pdm run python src/find_your_mate_ai/scraper.py --cookie-path ".startupschool-cookie.json"
 ```
 
 
