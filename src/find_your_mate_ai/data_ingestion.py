@@ -148,6 +148,7 @@ def fetch_all_documents_from_mongodb(
     return result_df
 
 
+# TODO: This is a costly function so we should move it to a proper orchestrator with incremental loads
 def ingest_profiles_data(
     source_data_path: str, output_data_path: str
 ) -> List[BaseNode]:
@@ -267,6 +268,7 @@ def ingest_profiles_data(
     return nodes
 
 
+# TODO: Needs to be implmeneted to use Mongo Vector Store Index
 def index_profiles_data(
     nodes: List[BaseNode], output_data_path: str
 ) -> VectorStoreIndex:
