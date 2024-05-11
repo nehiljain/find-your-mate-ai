@@ -176,3 +176,5 @@ data/pipeline_storage/*
 
 # Ignore dynaconf secret files
 .secrets.*
+
+.DS_Store

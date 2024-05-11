@@ -2,9 +2,11 @@
 This script is used to scrape the cofounder matching profiles from startupschool.org
 and save them the screenshot and page content as html and markdown formats
 """
+
+import os
 import json
 import logging
-import os
+
 import random
 import re
 import time
@@ -21,21 +23,26 @@ from unstructured.partition.html import partition_html
 from unstructured.staging.base import convert_to_dataframe
 from config import settings
 
+# TODO: Add a step to validate the full page was stored in the output file else retry
+import typer
+
+app = typer.Typer()
+
 # Configure logging
 logging.basicConfig(
-  level=logging.INFO,
-  format='%(asctime)s - %(levelname)s - %(message)s',
-  handlers=[
-    logging.FileHandler('scraper.log'),
-    logging.StreamHandler()
-  ]
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("scraper.log"), logging.StreamHandler()],
 )
 # TODO: Migrate to Dynaconf
 load_dotenv(find_dotenv())
+
+
 class FounderProfile(BaseModel):
     """
     CleanProfile is a Pydantic model that represents a cofounder matching profile.
     """
+
     filepath: Path
     profile_url: str
     linkedin_url: Optional[str]
@@ -117,15 +124,14 @@ def extract_clean_md_urls(filepath: Path) -> FounderProfile:
         age = soup.find("div", {"title": "Age"})
 
         return FounderProfile(
-                filepath=filepath,
-                profile_url=profile_url,
-                linkedin_url=linkedin_url,
-                md_content=markdown_output,
-                last_seen=last_seen.text,
-                age=int(age.text) if age and age.text.strip() else -1,
-                location=location.text,
-            )
-
+            filepath=filepath,
+            profile_url=profile_url,
+            linkedin_url=linkedin_url,
+            md_content=markdown_output,
+            last_seen=last_seen.text,
+            age=int(age.text) if age and age.text.strip() else -1,
+            location=location.text,
+        )
 
 
 def get_all_cofounder_text_files():
@@ -147,19 +153,19 @@ def load_cookies(cookie_path: Optional[str] = None):
 
 
 def slugify(text):
-  """
-  Slugify the text for filename
-  """
-  pattern = r'[^\w+]'
-  return re.sub(pattern, '-', text.lower().strip())
+    """
+    Slugify the text for filename
+    """
+    pattern = r"[^\w+]"
+    return re.sub(pattern, "-", text.lower().strip())
 
 
 def get_output_path(filename):
-  # write a function to get path from .env or create a data folder to store the output
-  # add the filename to the path
-  output_path = Path(os.getenv('OUTPUT_PATH', 'data'))
-  output_path.mkdir(exist_ok=True)
-  return output_path / filename
+    # write a function to get path from .env or create a data folder to store the output
+    # add the filename to the path
+    output_path = Path(os.getenv("OUTPUT_PATH", "data"))
+    output_path.mkdir(exist_ok=True)
+    return output_path / filename
 
 
 def get_url_from_file_text(filepath):
@@ -171,22 +177,26 @@ def get_url_from_file_text(filepath):
         )
         return profile_url.group(0)
 
-# TODO: Add a step to validate the full page was stored in the output file else retry
-
-import typer
-
-app = typer.Typer()
 
 @app.command()
-def main(urls: List[str] = typer.Option(None, help="List of URLs to scrape."),
-         num_profiles: int = typer.Option(None, help="Number of profiles to scrape dynamically. Cannot be used with URLs."),
-         cookie_path: Optional[str] = typer.Option(None, help="Path to the cookie file. If not provided, defaults to './startup-school-cookies.json'")):
+def main(
+    urls: List[str] = typer.Option(None, help="List of URLs to scrape."),
+    num_profiles: int = typer.Option(
+        None, help="Number of profiles to scrape dynamically. Cannot be used with URLs."
+    ),
+    cookie_path: Optional[str] = typer.Option(
+        None,
+        help="Path to the cookie file. If not provided, defaults to './startup-school-cookies.json'",
+    ),
+):
     """
     Main function to scrape the cofounder matching profiles from startupschool.org.
     This can either scrape profiles from a list of URLs provided, scrape a specified number of profiles dynamically, or continue until no more profiles are available.
     """
     if urls and num_profiles is not None:
-        raise ValueError("Cannot use both 'urls' and 'num_profiles' options at the same time.")
+        raise ValueError(
+            "Cannot use both 'urls' and 'num_profiles' options at the same time."
+        )
 
     logging.info("Starting the scraper...")
     with sync_playwright() as p:
@@ -198,7 +208,11 @@ def main(urls: List[str] = typer.Option(None, help="List of URLs to scrape."),
         )
         cookies = load_cookies(cookie_path)
         for cookie in cookies:
-            if "sameSite" not in cookie or cookie["sameSite"] not in ["Strict", "Lax", "None"]:
+            if "sameSite" not in cookie or cookie["sameSite"] not in [
+                "Strict",
+                "Lax",
+                "None",
+            ]:
                 cookie["sameSite"] = "None"
         context.add_cookies(cookies)
         logging.info("Cookies added to the browser context.")
@@ -208,15 +222,22 @@ def main(urls: List[str] = typer.Option(None, help="List of URLs to scrape."),
                 scrape_profile(context, url)
         elif num_profiles:
             for _ in range(num_profiles):
-                scrape_profile(context, "https://www.startupschool.org/cofounder-matching/candidate/next")
+                scrape_profile(
+                    context,
+                    "https://www.startupschool.org/cofounder-matching/candidate/next",
+                )
         else:
             while True:
-                if not scrape_profile(context, "https://www.startupschool.org/cofounder-matching/candidate/next"):
+                if not scrape_profile(
+                    context,
+                    "https://www.startupschool.org/cofounder-matching/candidate/next",
+                ):
                     break
 
         context.close()
         browser.close()
         logging.info("Scraper finished successfully.")
+
 
 def scrape_profile(context, url):
     logging.info("Initiating scraping for URL: %s", url)
@@ -228,7 +249,9 @@ def scrape_profile(context, url):
     full_content = page.content()
     headings = page.get_by_role("heading").all_text_contents()
     if not headings:
-        logging.warning("No headings found for URL: %s. Exiting the scraper for this URL.", url)
+        logging.warning(
+            "No headings found for URL: %s. Exiting the scraper for this URL.", url
+        )
         return False
     output_txt_path = get_output_path(f"{slugify(headings[0])}.txt")
     output_screenshot_path = get_output_path(f"{slugify(headings[0])}.png")
@@ -258,6 +281,6 @@ def scrape_profile(context, url):
     logging.info("Completed processing for URL: %s", url)
     return True
 
+
 if __name__ == "__main__":
     app()
-

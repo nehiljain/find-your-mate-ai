@@ -67,4 +67,3 @@ To ingest the data from the specified directory path and index it using LlamaInd
 ```
 pdm run python src/find_your_mate_ai/data_ingestion.py
 ```
-
