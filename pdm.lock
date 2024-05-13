@@ -5,7 +5,7 @@
 groups = ["default", "test"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:49b4618fdb04d34e7c2b21cebd54d82b43aabbfa20ab59d9c51b2ea0ae7d5a88"
+content_hash = "sha256:95aa6af5ded2fd642e0c06d64a8032a594fbe9fd98a5bf9a2eae2e537bbd9b9f"
 
 [[package]]
 name = "aiohttp"
@@ -2193,6 +2193,21 @@ files = [
 ]
 
 [[package]]
+name = "llama-index-vector-stores-pinecone"
+version = "0.1.7"
+requires_python = "<3.13,>=3.8.1"
+summary = "llama-index vector_stores pinecone integration"
+groups = ["default"]
+dependencies = [
+    "llama-index-core<0.11.0,>=0.10.11.post1",
+    "pinecone-client<4.0.0,>=3.0.2",
+]
+files = [
+    {file = "llama_index_vector_stores_pinecone-0.1.7-py3-none-any.whl", hash = "sha256:fa2facf546322cc05104d209624d48953386e6ea4f512e13be2daf11deb91936"},
+    {file = "llama_index_vector_stores_pinecone-0.1.7.tar.gz", hash = "sha256:594811f36823e049f94c9d871d6889d535b0169da28016fdcbb5d22946694ac7"},
+]
+
+[[package]]
 name = "llama-parse"
 version = "0.4.2"
 requires_python = "<4.0,>=3.8.1"
@@ -3111,6 +3126,23 @@ files = [
     {file = "pillow-10.3.0-pp39-pypy39_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:1a1d1915db1a4fdb2754b9de292642a39a7fb28f1736699527bb649484fb966a"},
     {file = "pillow-10.3.0-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:a0eaa93d054751ee9964afa21c06247779b90440ca41d184aeb5d410f20ff591"},
     {file = "pillow-10.3.0.tar.gz", hash = "sha256:9d2455fbf44c914840c793e89aa82d0e1763a14253a000743719ae5946814b2d"},
+]
+
+[[package]]
+name = "pinecone-client"
+version = "3.2.2"
+requires_python = "<4.0,>=3.8"
+summary = "Pinecone client and SDK"
+groups = ["default"]
+dependencies = [
+    "certifi>=2019.11.17",
+    "tqdm>=4.64.1",
+    "typing-extensions>=3.7.4",
+    "urllib3>=1.26.0; python_version >= \"3.8\" and python_version < \"3.12\"",
+]
+files = [
+    {file = "pinecone_client-3.2.2-py3-none-any.whl", hash = "sha256:7e492fdda23c73726bc0cb94c689bb950d06fb94e82b701a0c610c2e830db327"},
+    {file = "pinecone_client-3.2.2.tar.gz", hash = "sha256:887a12405f90ac11c396490f605fc479f31cf282361034d1ae0fccc02ac75bee"},
 ]
 
 [[package]]
