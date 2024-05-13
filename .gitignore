@@ -178,3 +178,6 @@ data/pipeline_storage/*
 .secrets.*
 
 .DS_Store
+
+.deepeval
+.deepeval-cache.json

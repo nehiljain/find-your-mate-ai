@@ -20,7 +20,7 @@ from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 
 
-from config import settings
+from find_your_mate_ai.config import settings
 from llama_index.core.evaluation import generate_question_context_pairs
 from llama_index.llms.openai import OpenAI
 from llama_index.core import SimpleDirectoryReader, StorageContext, VectorStoreIndex

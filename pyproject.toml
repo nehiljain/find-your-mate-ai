@@ -41,6 +41,10 @@ dependencies = [
     "cohere>=5.4.0",
     "thefuzz>=0.22.1",
     "llm>=0.13.1",
+    "arize-phoenix[evals]>=4.0.2",
+    "openinference-instrumentation-llama-index>=1.3.0",
+    "llama-index-callbacks-arize-phoenix>=0.1.5",
+    "deepeval>=0.21.41",
 ]
 requires-python = ">=3.11, <3.12"
 readme = "README.md"
