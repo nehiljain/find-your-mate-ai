@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 import re
 import hashlib
-from typing import List
+from typing import List, Tuple, get_origin, get_args, Optional
 from pydantic import BaseModel, Field
 import pendulum
 import openai
@@ -26,6 +26,7 @@ from llama_index.core import VectorStoreIndex
 from llama_index.vector_stores.pinecone import PineconeVectorStore
 from llama_index.core.evaluation import generate_question_context_pairs
 from llama_index.llms.openai import OpenAI
+from llama_index.core.llms.llm import LLM
 from llama_index.core import SimpleDirectoryReader, StorageContext
 from llama_index.core.node_parser import MarkdownNodeParser
 from llama_index.storage.kvstore.redis import RedisKVStore as RedisCache
@@ -34,6 +35,8 @@ from llama_index.storage.docstore.mongodb import MongoDocumentStore
 from llama_index.core.ingestion import IngestionPipeline, IngestionCache
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.program.openai import OpenAIPydanticProgram
+from llama_index.core.retrievers import VectorIndexAutoRetriever
+from llama_index.core.vector_stores import MetadataInfo, VectorStoreInfo
 
 from llama_index.core.extractors import PydanticProgramExtractor
 from pymongoarrow.monkey import patch_all
@@ -179,7 +182,7 @@ def ingest_profiles_data(
 
     openai.api_key = openai_api_key
 
-    storage_context = mongo_conn.get_storage_context()
+    # storage_context = mongo_conn.get_storage_context()
     documents = SimpleDirectoryReader(
         source_data_path,
         required_exts=[".mdx"],
@@ -195,35 +198,35 @@ def ingest_profiles_data(
     documents_df = pd.concat(
         [documents_df.drop(columns=["metadata"]), metadata_df], axis=1
     )
-    existing_documents_df = fetch_all_documents_from_mongodb(
-        mongo_conn.get_mongo_client(), mongo_conn.db_name, mongo_conn.collection_name
-    )
-    logging.info("Pre-existing documents in MongoDB: %d", len(existing_documents_df))
-    # Extract relevant columns for comparison
-    comparison_columns = [
-        "file_path",
-        "file_name",
-        "file_size",
-        "creation_date",
-        "last_modified_date",
-    ]
-    if not existing_documents_df.empty:
-        existing_documents_df = existing_documents_df[comparison_columns]
-        # Filter out documents that already exist in MongoDB
-        documents_df = documents_df.merge(
-            existing_documents_df, on=comparison_columns, how="left", indicator=True
-        )
-        documents_df = documents_df[documents_df["_merge"] == "left_only"].drop(
-            columns=["_merge"]
-        )
-    else:
-        logging.info("No existing documents found in MongoDB.")
-    # Filter documents based on the file_name that exist in document_df
-    documents = [
-        doc
-        for doc in documents
-        if doc.metadata["file_name"] in documents_df.file_name.values
-    ]
+    # existing_documents_df = fetch_all_documents_from_mongodb(
+    #     mongo_conn.get_mongo_client(), mongo_conn.db_name, mongo_conn.collection_name
+    # )
+    # logging.info("Pre-existing documents in MongoDB: %d", len(existing_documents_df))
+    # # Extract relevant columns for comparison
+    # comparison_columns = [
+    #     "file_path",
+    #     "file_name",
+    #     "file_size",
+    #     "creation_date",
+    #     "last_modified_date",
+    # ]
+    # if not existing_documents_df.empty:
+    #     existing_documents_df = existing_documents_df[comparison_columns]
+    #     # Filter out documents that already exist in MongoDB
+    #     documents_df = documents_df.merge(
+    #         existing_documents_df, on=comparison_columns, how="left", indicator=True
+    #     )
+    #     documents_df = documents_df[documents_df["_merge"] == "left_only"].drop(
+    #         columns=["_merge"]
+    #     )
+    # else:
+    #     logging.info("No existing documents found in MongoDB.")
+    # # Filter documents based on the file_name that exist in document_df
+    # documents = [
+    #     doc
+    #     for doc in documents
+    #     if doc.metadata["file_name"] in documents_df.file_name.values
+    # ]
     logging.info("Loaded %d new documents from %s", len(documents), source_data_path)
 
     # Configuring cache
@@ -252,7 +255,7 @@ def ingest_profiles_data(
             MarkdownNodeParser(),
             OpenAIEmbedding(),
         ],
-        docstore=storage_context.docstore,
+        # docstore=storage_context.docstore,
         cache=cache,
     )
 
@@ -270,31 +273,25 @@ def ingest_profiles_data(
     logging.info("Pipeline run finished with %d nodes created and stored", len(nodes))
     pipeline.persist(f"{output_data_path}/pipeline_storage")
     logging.info("Ingestion pipeline completed, persisted at %s", output_data_path)
-
-    storage_context.docstore.add_documents(nodes)
-    logging.info("Ingested %d nodes and stored in MongoDB", len(nodes))
+    # storage_context.docstore.add_documents(nodes)
+    # logging.info("Ingested %d nodes and stored in MongoDB", len(nodes))
 
     return nodes
 
 
-def index_profiles_data(
-    nodes: List[BaseNode],
-    output_data_path: str,
-    index_name: str = "profiles_index",
-    namespace: str = "find_your_mate_ai",
+def create_pinecone_index(
+    index_name: str,
     pinecone_api_key: str = None,
     pinecone_config: dict = None,
-) -> VectorStoreIndex:
-    """Indexes the profiles data using a VectorStore.
+) -> Tuple[Pinecone.Index, Pinecone]:
+    """
+    Creates or connects to a Pinecone index.
     Args:
-        nodes: List[BaseNode]: List of nodes to index.
-        output_data_path: str: Path to store the index.
         index_name: str: Name of the Pinecone index to create or connect.
-        namespace: str: Namespace for the Pinecone vector store.
         pinecone_api_key: str: API key for Pinecone, defaults to settings if None.
         pinecone_config: dict: Configuration for Pinecone index creation.
     Returns:
-        VectorStoreIndex: Index that can be used for retrieval and querying.
+        tuple: Contains Pinecone index object and Pinecone instance.
     """
     # Set default Pinecone configuration if none provided
     if pinecone_config is None:
@@ -313,21 +310,47 @@ def index_profiles_data(
 
     # Create or connect to an existing Pinecone index
     try:
-        pinecone.create_index(index_name, **pinecone_config)
+        logging.debug(
+            f"Creating Pinecone index {index_name} with config {pinecone_config}"
+        )
+        # This was a weird bug in using pinecone. So making sure we are sanitizing the index name before creating the index
+        sanitized_index_name = re.sub(r"[^a-zA-Z0-9]", "-", index_name)
+        logging.debug(f"Sanitized index name {sanitized_index_name}")
+        pinecone.create_index(sanitized_index_name, **pinecone_config)
+        logging.debug(f"Created Pinecone index {sanitized_index_name}")
     except Exception as e:
-        logging.info(f"Index {index_name} already exists or other error: {e}")
+        logging.info(f"Index {sanitized_index_name} already exists or other error: {e}")
 
-    pinecone_index = pinecone.Index(index_name)
+    return pinecone.Index(sanitized_index_name), pinecone, sanitized_index_name
 
+
+def index_profiles_data(
+    pinecone_index,
+    nodes: Optional[List[BaseNode]] = None,
+    namespace: str = "find_your_mate_ai",
+) -> VectorStoreIndex:
+    """Indexes the profiles data using a VectorStore.
+    Args:
+        nodes: List[BaseNode]: List of nodes to index.
+        pinecone_index: Pinecone: Pinecone index object.
+        namespace: str: Namespace for the Pinecone vector store.
+    Returns:
+        VectorStoreIndex: Index that can be used for retrieval and querying.
+    """
     # Setup Pinecone Vector Store
-    vector_store = PineconeVectorStore(
-        pinecone_index=pinecone_index, namespace=namespace
-    )
+    vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
+    if nodes:
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        # Create Vector Store Index
+        vector_store_index = VectorStoreIndex(
+            nodes=nodes, storage_context=storage_context
+        )
 
-    # Create Vector Store Index
-    vector_store_index = VectorStoreIndex(nodes=nodes, vector_store=vector_store)
-    logging.info(f"Vector store index created and persisted at {output_data_path}")
-
+    else:
+        vector_store_index = VectorStoreIndex.from_vector_store(
+            vector_store=vector_store
+        )
+    logging.info("Vector store index created and ready for use.")
     return vector_store_index
 
 
@@ -379,24 +402,72 @@ def generate_synthetic_questions_data(
     return qa_df
 
 
-def load_nodes_from_mongodb(mongo_uri: str) -> List[BaseNode]:
+def load_nodes_from_mongodb(
+    mongo_uri: str, db_name: str, namespace: str
+) -> List[BaseNode]:
     """
     Fetches all metadata from documents stored in a MongoDB collection and returns it as a pandas DataFrame.
     """
 
-    storage_context = StorageContext.from_defaults(
-        docstore=MongoDocumentStore.from_uri(uri=mongo_uri),
+    # storage_context = StorageContext.from_defaults(
+    #     docstore=MongoDocumentStore.from_uri(
+    #         uri=mongo_uri,
+    #         db_name=db_name,
+    #         namespace=namespace,
+    #     )
+    # )
+    # docs = storage_context.docstore.docs
+    # logging.info("Number of nodes loaded from MongoDB: %d", len(docs))
+    # return [node for _, node in docs.items()]
+    return []
+
+
+def get_type_string(tp):
+    origin = get_origin(tp)
+    if origin:
+        # For generic types, like List[str]
+        args = get_args(tp)
+        args_string = ", ".join(get_type_string(arg) for arg in args)
+        return f"{origin.__name__}[{args_string}]"
+    else:
+        # For non-generic types, like int or str
+        return tp.__name__
+
+
+def create_auto_retriever(vector_store_index: VectorStoreIndex, llm: LLM):
+    metadata_info = [
+        MetadataInfo(
+            name=name,
+            type=get_type_string(field.annotation),
+            description=field.description,
+        )
+        for name, field in CofounderMetadata.__fields__.items()
+    ]
+
+    # Define metadata information
+    vector_store_info = VectorStoreInfo(
+        content_info="Profiles of founders from startup school YC platform",
+        metadata_info=metadata_info,
     )
-    docs = storage_context.docstore.docs
-    logging.info("Number of nodes loaded from MongoDB: %d", len(docs))
-    return [node for _, node in docs.items()]
+
+    # Create VectorIndexAutoRetriever
+    retriever = VectorIndexAutoRetriever(
+        index=vector_store_index,
+        vector_store_info=vector_store_info,
+        llm=llm,
+        empty_query_top_k=10,
+        top_k=5,
+        verbose=True,
+    )
+
+    return retriever
 
 
 def main():
     nodes = ingest_profiles_data(
         source_data_path=settings.SOURCE_DATA_PATH,
         output_data_path=settings.OUTPUT_DATA_PATH,
-        mongo_uri=settings.MONGO_URI,
+        # mongo_uri=settings.MONGO_URI,
         openai_api_key=settings.OPENAI_API_KEY,
     )
     logging.info("Ingested %d nodes and stored in MongoDB", len(nodes))
