@@ -57,7 +57,18 @@ distribution = false
 
 [tool.pdm.dev-dependencies]
 dev = [
-    "pytest>=8.2.0",
     "llm>=0.13.1",
     "pre-commit>=3.7.0",
 ]
+test = [
+    "pytest-mock>=3.14.0",
+    "pytest>=8.2.0",
+    "ipdb>=0.13.13",
+]
+
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "INFO"
+log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+log_date_format = "%Y-%m-%d %H:%M:%S"

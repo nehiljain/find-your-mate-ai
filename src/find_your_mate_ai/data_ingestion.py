@@ -20,10 +20,13 @@ from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 
 
-from find_your_mate_ai.config import settings
+from src.find_your_mate_ai.config import settings
+from pinecone import Pinecone, ServerlessSpec
+from llama_index.core import VectorStoreIndex
+from llama_index.vector_stores.pinecone import PineconeVectorStore
 from llama_index.core.evaluation import generate_question_context_pairs
 from llama_index.llms.openai import OpenAI
-from llama_index.core import SimpleDirectoryReader, StorageContext, VectorStoreIndex
+from llama_index.core import SimpleDirectoryReader, StorageContext
 from llama_index.core.node_parser import MarkdownNodeParser
 from llama_index.storage.kvstore.redis import RedisKVStore as RedisCache
 from llama_index.core.schema import BaseNode
@@ -92,67 +95,78 @@ def get_file_id(file_name: str, file_size: int) -> str:
     return hashlib.sha256(file_name.encode() + str(file_size).encode()).hexdigest()
 
 
+class MongoConnection:
+    """
+    MongoConnection is a class that is responsible for connecting to a MongoDB database and retrieving a storage context.
+    """
+
+    def __init__(
+        self,
+        mongo_uri: str,
+        db_name: str,
+        collection_name: str,
+        server_api_version: str = "1",
+    ):
+        self.mongo_uri = mongo_uri
+        self.db_name = db_name
+        self.collection_name = collection_name
+        self.server_api_version = server_api_version
+
+    def get_mongo_client(self):
+        """
+        Returns a MongoClient instance.
+        """
+        return MongoClient(
+            self.mongo_uri, server_api=ServerApi(self.server_api_version)
+        )
+
+    def get_storage_context(self):
+        """
+        Returns a StorageContext instance. StorageContext is LlamaIndex's class that contains a docstore.
+        """
+        return StorageContext.from_defaults(
+            docstore=MongoDocumentStore.from_uri(
+                uri=self.mongo_uri, db_name=self.db_name, namespace=self.collection_name
+            ),
+        )
+
+
 def fetch_all_documents_from_mongodb(
-    mongo_uri: str, db_name: str, collection_name: str
+    client: MongoClient, db_name: str, collection_name: str
 ) -> pd.DataFrame:
     """
     Fetches all metadata from documents stored in a MongoDB collection and returns it as a pandas DataFrame.
 
     Args:
-    mongo_uri (str): MongoDB URI for connecting to the database.
+    client (MongoClient): MongoClient instance.
     db_name (str): Name of the database.
     collection_name (str): Name of the collection where documents are stored.
 
     Returns:
     pd.DataFrame: DataFrame containing all metadata from the documents.
     """
-    # Create a new client and connect to the server with MongoDB versioning
-    client = MongoClient(settings.MONGO_URI, server_api=ServerApi("1"))
-
-    # Access the specific database and collection
     database = client[db_name]
     collection = database[collection_name]
-
-    # Use pymongoarrow to fetch all documents as a pandas DataFrame
     df = collection.find_pandas_all({})
-
     if df.empty:
-        logging.info("No documents found in MongoDB collection.")
+        logging.info(
+            f"No documents found in MongoDB collection {db_name} {collection_name}"
+        )
         return pd.DataFrame()
     metadata_df = df["__data__"].apply(lambda x: x.get("metadata", {})).apply(pd.Series)
-
-    # Join the metadata columns back to the original DataFrame
     result_df = df.join(metadata_df)
-    result_df = result_df[
-        [
-            "_id",
-            "file_path",
-            "file_name",
-            "file_size",
-            "creation_date",
-            "last_modified_date",
-        ]
-    ]
-    logging.info("Fetched %d documents from MongoDB", len(result_df))
-    logging.info("Columns in the DataFrame: %s", result_df.columns)
-    # Remove duplicate rows from the DataFrame
     result_df.drop_duplicates(
         subset=result_df.columns.difference(["_id"]), keep="first", inplace=True
     )
-    logging.info(
-        "Dropped %d duplicate rows from the DataFrame", len(df) - len(result_df)
-    )
-    # Clean up by closing the MongoDB client
-    client.close()
-
     return result_df
 
 
-# TODO: This is a costly function so we should move it to a proper orchestrator with incremental loads
 def ingest_profiles_data(
-    source_data_path: str, output_data_path: str
+    source_data_path: str,
+    output_data_path: str,
+    openai_api_key: str,
+    mongo_conn: MongoConnection,
 ) -> List[BaseNode]:
-    """Ingests data from the specified directory path."""
     source_data_path = Path(source_data_path)
     output_data_path = Path(output_data_path)
     if not source_data_path.exists() or not source_data_path.is_dir():
@@ -163,18 +177,15 @@ def ingest_profiles_data(
         sys.exit(1)
     logging.info("Starting data ingestion from %s", source_data_path)
 
-    # Configure OpenAI API key
-    openai.api_key = settings.OPENAI_API_KEY
-    logging.info("OpenAI API key configured")
+    openai.api_key = openai_api_key
 
-    MONGO_URI = settings.MONGO_URI
-    storage_context = StorageContext.from_defaults(
-        docstore=MongoDocumentStore.from_uri(uri=MONGO_URI),
-    )
-    # Load documents from the specified directory
+    storage_context = mongo_conn.get_storage_context()
     documents = SimpleDirectoryReader(
-        source_data_path, required_exts=[".mdx"], filename_as_id=True
+        source_data_path,
+        required_exts=[".mdx"],
+        filename_as_id=True,
     ).load_data()
+    logging.info("Loaded %d documents from %s", len(documents), source_data_path)
     documents = documents[:50]
     for doc in documents:
         doc.doc_id = get_file_id(doc.metadata["file_name"], doc.metadata["file_size"])
@@ -184,10 +195,8 @@ def ingest_profiles_data(
     documents_df = pd.concat(
         [documents_df.drop(columns=["metadata"]), metadata_df], axis=1
     )
-    db_name = "db_docstore"
-    collection_name = "docstore/data"
     existing_documents_df = fetch_all_documents_from_mongodb(
-        MONGO_URI, db_name, collection_name
+        mongo_conn.get_mongo_client(), mongo_conn.db_name, mongo_conn.collection_name
     )
     logging.info("Pre-existing documents in MongoDB: %d", len(existing_documents_df))
     # Extract relevant columns for comparison
@@ -223,7 +232,7 @@ def ingest_profiles_data(
         collection="redis_cache",
     )
 
-    gpt3 = OpenAI(model="gpt-4")
+    gpt3 = OpenAI(model="gpt-3.5-turbo")
     openai_program = OpenAIPydanticProgram.from_defaults(
         output_cls=CofounderMetadata,
         prompt_template_str=EXTRACT_TEMPLATE_STR,
@@ -268,19 +277,58 @@ def ingest_profiles_data(
     return nodes
 
 
-# TODO: Needs to be implmeneted to use Mongo Vector Store Index
 def index_profiles_data(
-    nodes: List[BaseNode], output_data_path: str
+    nodes: List[BaseNode],
+    output_data_path: str,
+    index_name: str = "profiles_index",
+    namespace: str = "find_your_mate_ai",
+    pinecone_api_key: str = None,
+    pinecone_config: dict = None,
 ) -> VectorStoreIndex:
     """Indexes the profiles data using a VectorStore.
     Args:
         nodes: List[BaseNode]: List of nodes to index.
         output_data_path: str: Path to store the index.
+        index_name: str: Name of the Pinecone index to create or connect.
+        namespace: str: Namespace for the Pinecone vector store.
+        pinecone_api_key: str: API key for Pinecone, defaults to settings if None.
+        pinecone_config: dict: Configuration for Pinecone index creation.
     Returns:
         VectorStoreIndex: Index that can be used for retrieval and querying.
     """
-    # Create vector store index
-    pass
+    # Set default Pinecone configuration if none provided
+    if pinecone_config is None:
+        pinecone_config = {
+            "dimension": 1536,  # Assuming dimension size from embeddings
+            "metric": "cosine",
+            "spec": ServerlessSpec(cloud="aws", region="us-west-2"),
+        }
+
+    # Use default API key from settings if not provided
+    if pinecone_api_key is None:
+        pinecone_api_key = settings.PINECONE_API_KEY
+
+    # Initialize Pinecone
+    pinecone = Pinecone(api_key=pinecone_api_key)
+
+    # Create or connect to an existing Pinecone index
+    try:
+        pinecone.create_index(index_name, **pinecone_config)
+    except Exception as e:
+        logging.info(f"Index {index_name} already exists or other error: {e}")
+
+    pinecone_index = pinecone.Index(index_name)
+
+    # Setup Pinecone Vector Store
+    vector_store = PineconeVectorStore(
+        pinecone_index=pinecone_index, namespace=namespace
+    )
+
+    # Create Vector Store Index
+    vector_store_index = VectorStoreIndex(nodes=nodes, vector_store=vector_store)
+    logging.info(f"Vector store index created and persisted at {output_data_path}")
+
+    return vector_store_index
 
 
 def from_qa_dataset_to_df(qa_dataset) -> pd.DataFrame:
@@ -348,6 +396,8 @@ def main():
     nodes = ingest_profiles_data(
         source_data_path=settings.SOURCE_DATA_PATH,
         output_data_path=settings.OUTPUT_DATA_PATH,
+        mongo_uri=settings.MONGO_URI,
+        openai_api_key=settings.OPENAI_API_KEY,
     )
     logging.info("Ingested %d nodes and stored in MongoDB", len(nodes))
     generate_synthetic_questions_data(nodes, settings.OUTPUT_DATA_PATH)
